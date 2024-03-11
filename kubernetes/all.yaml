@@ -1,0 +1,103 @@
+---
+
+kind: namespace
+apiVersion: v1
+metadata:
+  name: eventwhisper
+  labels:
+    name: eventwhisper
+
+---
+
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: postgres-secret
+  namespace: eventwhisper
+  labels:
+    app: postgres
+data:
+  POSTGRES_DB: ps_db
+  POSTGRES_USER: ps_user
+  POSTGRES_PASSWORD: SecurePassword
+
+---
+
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: whisper-core
+  namespace: eventwhisper
+spec:
+  replicas: 1
+  strategy:
+    type: RollingUpdate
+    rollingUpdate:
+      maxSurge: 1
+      maxUnavailable: 1
+  selector:
+    matchLabels:
+      app: whisper-core
+  template:
+    metadata:
+      labels:
+        app: whisper-core
+    spec:
+      containers:
+        - name: whisper-core
+          image: ghcr.io/eventwhisper/whisper-core:v1.0.4
+          ports:
+            - containerPort: 8080
+          env:
+            - name: OAI_API_KEY
+              valueFrom:
+                secretKeyRef:
+                  name: whisper-core-openai-token
+                  key: OAI_API_KEY
+
+---
+
+apiVersion: v1
+kind: Service
+metadata:
+  name: whisper-core-service
+  namespace: whisper-core
+spec:
+  selector:
+    app: whisper-core
+  ports:
+    - protocol: TCP
+      port: 80
+      targetPort: 8080
+  type: LoadBalancer
+
+---
+
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: whisper-core
+  namespace: whisper-core
+  annotations:
+    spec.ingressClassName: traefik
+    cert-manager.io/cluster-issuer: letsencrypt-prod
+    traefik.ingress.kubernetes.io/router.middlewares: default-redirect-https@kubernetescrd
+  # labels:
+  #   app: whisper-core-deployment
+  # namespace: default
+spec:
+  rules:
+    - host: whisper-core.hmnd.de # Change by your domain
+      http:
+        paths:
+          - path: /
+            pathType: Prefix
+            backend:
+              service:
+                name: whisper-core-service
+                port:
+                  number: 80
+  tls:
+    - secretName: whisper-core-tls
+      hosts:
+        - whisper-core.hmnd.de # Change by your domain

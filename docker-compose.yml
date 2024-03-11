@@ -1,0 +1,44 @@
+version: '3.8'
+
+networks:
+  traefik_net:
+    external: true
+  backend_whisper:
+    external: true
+
+services:
+  whisper_core:
+    container_name: whisper_core
+    build: .
+    restart: always
+    logging:
+      driver: "json-file"
+      options:
+        max-file: "10"
+        max-size: "100k"
+    networks:
+      - traefik_net
+      - backend_whisper
+    volumes:
+      - ${DB_FILE_PATH}:/app/_data
+    environment:
+      MONGODB_SERVER: mongodb
+      MONGODB_PORT: 27017
+      MONGO_CONNECTION: ${MONGO_CONNECTION}
+      PORT: 8080
+      API_KEY: ${API_KEY}
+    labels:
+        - traefik.enable=true
+        - traefik.docker.network=traefik_net
+        - traefik.http.routers.whisper_core.entrypoints=http
+        - traefik.http.routers.whisper_core.rule=Host("${DOMAIN}")
+        - traefik.http.middlewares.whisper_core-https-redirect.redirectscheme.scheme=https
+        - traefik.http.routers.whisper_core.middlewares=whisper_core-https-redirect
+        - traefik.http.routers.whisper_core-secure.entrypoints=https
+        - traefik.http.routers.whisper_core-secure.rule=Host("${DOMAIN}")
+        - traefik.http.routers.whisper_core-secure.tls=true
+        - traefik.http.routers.whisper_core-secure.tls.certresolver=http
+        - traefik.http.routers.whisper_core-secure.service=whisper_core
+        - traefik.http.services.whisper_core.loadbalancer.server.port=8080
+
+
