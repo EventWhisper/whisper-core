@@ -1,9 +1,8 @@
 
 name: Feature Request
 description: For any new an exiting features you wish to be integrated
+labels: ['feature-request']
 
-labels: feature-request
-title: 
 body:
   - type: markdown
     attributes:
